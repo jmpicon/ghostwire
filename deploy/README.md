@@ -59,7 +59,18 @@ HiddenServicePort 1717 127.0.0.1:1717
 HiddenServiceVersion 3
 ```
 
-**3. Start both.**
+**3. Keep tor awake.** A tor that has only ever served a SOCKS port enters
+*dormant* mode after prolonged client inactivity — which is exactly the state
+an idle home server's tor is in when you decide to give it an onion service.
+A dormant tor is not a good host for one. Also append:
+
+```
+DormantTimeoutEnabled 0
+DormantCanceledByStartup 1
+```
+
+**4. Start both.** Use `restart`, not `reload`, the first time: a HUP wakes a
+dormant tor but is not a reliable way to bring a brand-new hidden service up.
 
 ```bash
 sudo install -m 0644 gwd.service /etc/systemd/system/
@@ -68,6 +79,10 @@ sudo systemctl enable --now gwd
 sudo systemctl restart tor@default          # or tor.service
 sudo cat /var/lib/tor/ghostwire/hostname    # your relay address
 ```
+
+On Debian and Raspberry Pi OS, `tor@default` reports `enabled-runtime`, which
+looks alarming and is not: the enabled `tor.service` wrapper pulls the instance
+in at boot. Check `systemctl is-enabled tor.service` instead.
 
 The address is stable as long as `/var/lib/tor/ghostwire/` survives. Delete
 that directory to get a new one and leave nothing behind.
@@ -113,3 +128,17 @@ cells arrived and were dropped — check `-max-conns` and the rate limit.
 If nothing moves at all, the failure is transport, not ghostwire: check that
 tor bootstrapped to 100% on both ends, and remember that a first connection to
 a freshly published onion service can take tens of seconds.
+
+Two traps worth knowing before you spend an evening on them:
+
+**`curl --socks5-hostname telnet://host:1717` tells you nothing.** curl opens
+the connection and then blocks reading until `--max-time`, so it exits 28
+whether or not it reached anything. Use the real client and read the relay's
+counters.
+
+**`cmd | tail` reports `tail`'s exit status, not the client's.** `rc=0` from a
+pipeline is not evidence that the send worked. Run the client unpiped, or check
+`PIPESTATUS`.
+
+The only trustworthy signal is the relay's `in`/`out` counters moving, measured
+before and after.
