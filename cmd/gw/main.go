@@ -56,6 +56,9 @@ func main() {
 		case "pipe":
 			runPipe(os.Args[2:])
 			return
+		case "tail":
+			runTail(os.Args[2:])
+			return
 		case "version":
 			fmt.Printf("gw %s\n", version)
 			return
@@ -333,6 +336,83 @@ func runPipe(args []string) {
 	cli.Close()
 }
 
+// ---- gw tail --------------------------------------------------------------
+
+// runTail is the mirror of gw pipe: it joins channels and writes every message
+// it receives to stdout, one line each, and nothing else. Everything that is
+// not channel content — link state, presence, errors — goes to stderr, so the
+// stream stays pipeable into grep, a log shipper or another gw pipe.
+func runTail(args []string) {
+	o := parseFlags("gw tail", args)
+	if len(o.joins) == 0 {
+		fatal("gw tail needs at least one -join <#channel>")
+	}
+
+	dial, _, err := transport(o)
+	if err != nil {
+		fatal("%v", err)
+	}
+	id, err := identity(o.identity)
+	if err != nil {
+		fatal("%v", err)
+	}
+	joins, err := collectJoins(o)
+	if err != nil {
+		fatal("%v", err)
+	}
+
+	cli, err := client.New(client.Config{
+		Addr:       o.relay,
+		Dial:       dial,
+		Identity:   id,
+		Nick:       o.nick,
+		NoiseMean:  o.noiseMean,
+		SendJitter: o.jitter,
+		Reconnect:  !o.noRetry,
+	})
+	if err != nil {
+		fatal("%v", err)
+	}
+
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+	go func() { _ = cli.Run(ctx) }()
+
+	out := bufio.NewWriter(os.Stdout)
+	defer out.Flush()
+
+	var joined bool
+	for ev := range cli.Events() {
+		switch ev.Kind {
+		case client.EvConnected:
+			fmt.Fprintf(os.Stderr, "gw tail: link up → %s\n", ev.Text)
+			if !joined {
+				joined = true
+				for _, j := range joins {
+					if err := cli.Join(j.Name, j.Passphrase); err != nil {
+						fmt.Fprintf(os.Stderr, "gw tail: join %s: %v\n", j.Name, err)
+					}
+				}
+			}
+		case client.EvDisconnected:
+			fmt.Fprintf(os.Stderr, "gw tail: link down (%s)\n", ev.Text)
+		case client.EvError:
+			fmt.Fprintf(os.Stderr, "gw tail: %s\n", ev.Text)
+		case client.EvPresence:
+			fmt.Fprintf(os.Stderr, "gw tail: %s %s#%s %s\n", ev.Channel,
+				ev.Msg.Nick, gcrypto.Short(ev.Msg.Fingerprint()), ev.Msg.Body)
+		case client.EvMessage:
+			// Line-buffered so a reader downstream sees each alert as it
+			// lands rather than when a 4 KiB buffer happens to fill.
+			fmt.Fprintf(out, "%s %s %s#%s %s\n",
+				ev.Msg.Sent.Local().Format("2006-01-02 15:04"),
+				ev.Channel, ev.Msg.Nick, gcrypto.Short(ev.Msg.Fingerprint()),
+				ev.Msg.Body)
+			out.Flush()
+		}
+	}
+}
+
 func env(k, def string) string {
 	if v := os.Getenv(k); v != "" {
 		return v
@@ -355,10 +435,12 @@ usage:
   gw -relay <addr>.onion:1717 -join '#room' -nick ghost -identity ~/.gw/id
   gw keygen -o ~/.gw/id
   echo "alert" | gw pipe -relay <addr>.onion:1717 -join '#ops'
+  gw tail -relay <addr>.onion:1717 -join '#ops' | grep -i critical
 
 subcommands:
   keygen    mint a persistent identity seed (default is ephemeral)
   pipe      send stdin lines into a channel, no terminal required
+  tail      print received messages to stdout, no terminal required
   version   print version
 
 flags:
