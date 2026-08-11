@@ -84,7 +84,7 @@ make test       # unit + integration, with -race
 Single static binaries, no runtime, no dependencies:
 
 ```bash
-make cross      # linux/darwin/windows × amd64/arm64 into dist/
+make cross      # linux/darwin/windows/freebsd × amd64/arm64/armv7 into dist/
 ```
 
 ## Run a relay
