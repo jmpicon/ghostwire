@@ -1,0 +1,51 @@
+# A ghostwire relay behind its own tor daemon.
+#
+#   docker compose up -d --build
+#   docker compose exec -T tor cat /var/lib/tor/ghostwire/hostname
+#
+# The relay port is never published to the host and the relay container has no
+# route off the box. The only way in is the onion service, which is the point.
+
+services:
+  tor:
+    build:
+      context: .
+      dockerfile: Dockerfile.tor
+    container_name: ghostwire-tor
+    restart: unless-stopped
+    volumes:
+      - ./torrc:/etc/tor/torrc:ro
+      - tor-data:/var/lib/tor
+    networks:
+      # rendezvous with the relay, plus the egress it needs to reach the
+      # tor network itself.
+      - ghostwire
+      - egress
+    depends_on:
+      - gwd
+
+  gwd:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    container_name: ghostwire-relay
+    restart: unless-stopped
+    command: ["-listen", "0.0.0.0:1717", "-stats", "1h"]
+    networks:
+      # internal only: this container cannot reach the internet at all.
+      - ghostwire
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    # No volumes: the relay has nothing to persist and nowhere to write.
+
+networks:
+  ghostwire:
+    internal: true
+  egress: {}
+
+volumes:
+  # Holds only the onion service key, so the address survives a restart.
+  # Delete it to get a brand new address and leave nothing behind.
+  tor-data:

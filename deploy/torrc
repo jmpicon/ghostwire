@@ -1,0 +1,22 @@
+# tor configuration for a ghostwire relay.
+#
+# This tor exists only to publish one onion service. It is not a SOCKS proxy,
+# not a relay for anyone else, and it never acts as an exit.
+
+SocksPort 0
+ControlPort 0
+
+HiddenServiceDir /var/lib/tor/ghostwire/
+HiddenServicePort 1717 gwd:1717
+
+# v3 is the default and the only acceptable version.
+HiddenServiceVersion 3
+
+# Single-hop onion services are faster and give up the service's own location
+# anonymity. Leave this off unless you genuinely do not care whether the relay
+# host can be found — you almost certainly do care.
+# HiddenServiceSingleHopMode 1
+# HiddenServiceNonAnonymousMode 1
+
+Log notice stderr
+DataDirectory /var/lib/tor

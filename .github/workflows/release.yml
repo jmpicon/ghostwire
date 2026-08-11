@@ -1,0 +1,43 @@
+name: release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          check-latest: true
+
+      - name: test before shipping
+        run: go test -race -count=1 ./...
+
+      - name: build every platform
+        run: make cross VERSION=${{ github.ref_name }}
+
+      - name: publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ github.ref_name }}" dist/* \
+            --title "ghostwire ${{ github.ref_name }}" \
+            --notes "Static binaries, no runtime dependencies.
+
+          Verify before running:
+
+              sha256sum -c SHA256SUMS
+
+          These builds are not reproducible yet and are signed only by
+          GitHub's release infrastructure. If you are relying on ghostwire
+          for anything serious, build from source and check \`go.sum\`."

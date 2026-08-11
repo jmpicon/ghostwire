@@ -1,0 +1,10 @@
+# The tor daemon that publishes the relay's onion service. Kept separate from
+# the relay image so that gwd stays a scratch container with nothing in it.
+FROM alpine:3.20
+
+RUN apk add --no-cache tor su-exec
+
+COPY tor-entrypoint.sh /tor-entrypoint.sh
+RUN chmod 0755 /tor-entrypoint.sh
+
+ENTRYPOINT ["/tor-entrypoint.sh"]

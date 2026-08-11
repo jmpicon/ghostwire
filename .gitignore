@@ -1,0 +1,16 @@
+bin/
+dist/
+
+# Never let key material near the index.
+*.key
+*.seed
+id
+onion.key
+.gw/
+
+# Local scratch
+*.log
+*.out
+*.test
+coverage.*
+.DS_Store
