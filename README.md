@@ -112,6 +112,11 @@ Or with Docker, tor included:
 cd deploy && docker compose up -d && make -C .. onion   # prints the address
 ```
 
+A relay is stateless and does no cryptography — all the expensive work happens
+in the client — so it does not need a server. A Raspberry Pi carries a channel
+comfortably. [deploy/README.md](deploy/README.md) covers docker, systemd on a
+board that already runs tor, and how to think about *where* to put one.
+
 ## Connect
 
 ```bash

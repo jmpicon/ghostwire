@@ -1,0 +1,61 @@
+# ghostwire relay as a system service, fronted by the host's tor.
+#
+#   sudo cp gwd /usr/local/bin/
+#   sudo cp gwd.service /etc/systemd/system/
+#   sudo systemctl enable --now gwd
+#
+# This unit assumes tor publishes the onion service via a HiddenServiceDir in
+# torrc (see deploy/README.md). gwd therefore needs no tor credentials, no
+# control port and no filesystem access whatsoever — so it gets none.
+
+[Unit]
+Description=ghostwire relay (blind rendezvous for anonymous channels)
+Documentation=https://github.com/jmpicon/ghostwire
+After=network-online.target tor.service tor@default.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/gwd -listen 127.0.0.1:1717 -max-conns 128 -stats 6h
+Restart=always
+RestartSec=5s
+
+# The relay holds no state and writes nothing, so it is given nothing.
+DynamicUser=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+NoNewPrivileges=yes
+UMask=0077
+
+ProtectSystem=strict
+ProtectHome=yes
+ProtectProc=invisible
+ProcSubset=pid
+PrivateTmp=yes
+PrivateDevices=yes
+PrivateUsers=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+
+RestrictAddressFamilies=AF_INET AF_INET6
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources @obsolete
+
+# Worst case memory is roughly max-conns * 128 KiB of queued cells. At the 128
+# above that is ~16 MiB, which is why a 1 GiB single-board computer is a
+# perfectly serious place to run this.
+MemoryMax=192M
+TasksMax=256
+
+[Install]
+WantedBy=multi-user.target

@@ -2,7 +2,10 @@ SHELL     := /bin/sh
 VERSION   ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS   := -s -w -X main.version=$(VERSION)
 GOFLAGS   := -trimpath
-PLATFORMS := linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 freebsd/amd64
+# linux/arm is 32-bit ARMv7: Raspberry Pi OS still ships a 32-bit userland on
+# plenty of boards, and a relay is exactly the job you want to hand to an SBC.
+PLATFORMS := linux/amd64 linux/arm64 linux/arm darwin/amd64 darwin/arm64 windows/amd64 freebsd/amd64
+GOARM     ?= 7
 
 .PHONY: all build test race vet fmt lint cross clean install docker onion help
 
@@ -38,13 +41,14 @@ lint:
 cross:
 	@mkdir -p dist
 	@for p in $(PLATFORMS); do \
-		os=$${p%/*}; arch=$${p#*/}; ext=''; \
+		os=$${p%/*}; arch=$${p#*/}; ext=''; suffix=$$arch; \
 		[ "$$os" = windows ] && ext='.exe'; \
-		echo "  $$os/$$arch"; \
-		CGO_ENABLED=0 GOOS=$$os GOARCH=$$arch go build $(GOFLAGS) -ldflags '$(LDFLAGS)' \
-			-o dist/gw-$$os-$$arch$$ext ./cmd/gw || exit 1; \
-		CGO_ENABLED=0 GOOS=$$os GOARCH=$$arch go build $(GOFLAGS) -ldflags '$(LDFLAGS)' \
-			-o dist/gwd-$$os-$$arch$$ext ./cmd/gwd || exit 1; \
+		[ "$$arch" = arm ] && suffix="armv$(GOARM)"; \
+		echo "  $$os/$$suffix"; \
+		CGO_ENABLED=0 GOOS=$$os GOARCH=$$arch GOARM=$(GOARM) go build $(GOFLAGS) -ldflags '$(LDFLAGS)' \
+			-o dist/gw-$$os-$$suffix$$ext ./cmd/gw || exit 1; \
+		CGO_ENABLED=0 GOOS=$$os GOARCH=$$arch GOARM=$(GOARM) go build $(GOFLAGS) -ldflags '$(LDFLAGS)' \
+			-o dist/gwd-$$os-$$suffix$$ext ./cmd/gwd || exit 1; \
 	done
 	@cd dist && sha256sum * > SHA256SUMS && echo "checksums in dist/SHA256SUMS"
 
