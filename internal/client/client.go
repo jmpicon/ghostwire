@@ -25,6 +25,7 @@ var (
 	ErrJoined     = errors.New("client: already joined")
 	ErrTooLong    = errors.New("client: message too long")
 	ErrNotRunning = errors.New("client: session is not connected")
+	ErrBusy       = errors.New("client: send queue is full")
 )
 
 // FreshnessWindow bounds how far a message's timestamp may drift before it is
@@ -117,6 +118,13 @@ type Client struct {
 	conn   net.Conn
 	outbox chan []byte
 
+	// sendq carries whole messages, already sealed and split into cells.
+	// Everything goes out through this one queue so that send jitter delays
+	// the stream rather than each message independently: jittering per
+	// message reorders any burst, which for a multi-line incident report is
+	// worse than useless.
+	sendq chan [][]byte
+
 	nickMu sync.RWMutex
 	nick   string
 
@@ -136,16 +144,46 @@ func New(cfg Config) (*Client, error) {
 	if strings.TrimSpace(cfg.Addr) == "" {
 		return nil, errors.New("client: relay address is required")
 	}
-	return &Client{
+	c := &Client{
 		cfg:    cfg,
 		events: make(chan Event, 256),
 		guard:  gcrypto.NewReplayGuard(FreshnessWindow),
 		chans:  make(map[string]*joined),
 		byID:   make(map[[wire.ChanIDLen]byte]*joined),
 		outbox: make(chan []byte, 512),
+		sendq:  make(chan [][]byte, 128),
 		nick:   cfg.Nick,
 		done:   make(chan struct{}),
-	}, nil
+	}
+	go c.sendLoop()
+	return c, nil
+}
+
+// sendLoop serialises outbound messages. One goroutine, one queue: jitter is
+// applied between messages, never in parallel across them, so the order a
+// caller wrote is the order the channel sees.
+func (c *Client) sendLoop() {
+	for {
+		select {
+		case <-c.done:
+			return
+		case cells := <-c.sendq:
+			if d := noise.Jitter(c.cfg.SendJitter); d > 0 {
+				select {
+				case <-time.After(d):
+				case <-c.done:
+					return
+				}
+			}
+			for _, payload := range cells {
+				cell, err := wire.Marshal(wire.TypeData, payload)
+				if err != nil {
+					break
+				}
+				c.enqueue(cell)
+			}
+		}
+	}
 }
 
 // Events is the stream the UI ranges over.
@@ -476,23 +514,14 @@ func (c *Client) sendKind(name string, kind gcrypto.Kind, body string) error {
 		return err
 	}
 
-	go func() {
-		if d := noise.Jitter(c.cfg.SendJitter); d > 0 {
-			select {
-			case <-time.After(d):
-			case <-c.done:
-				return
-			}
-		}
-		for _, payload := range cells {
-			cell, err := wire.Marshal(wire.TypeData, payload)
-			if err != nil {
-				return
-			}
-			c.enqueue(cell)
-		}
-	}()
-	return nil
+	select {
+	case c.sendq <- cells:
+		return nil
+	case <-c.done:
+		return ErrNotRunning
+	default:
+		return ErrBusy
+	}
 }
 
 // Channels lists joined channel names, sorted.

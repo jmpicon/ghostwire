@@ -2,6 +2,7 @@ package relay_test
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"testing"
 	"time"
@@ -48,6 +49,9 @@ func startClient(t *testing.T, addr, nick string) (*client.Client, <-chan client
 		Identity:  id,
 		Nick:      nick,
 		NoiseMean: 0,
+		// Non-zero on purpose: jitter is the code path that used to reorder
+		// bursts, so every test exercises it.
+		SendJitter: 150 * time.Millisecond,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -244,5 +248,41 @@ func TestPartStopsDelivery(t *testing.T) {
 	}
 	if got := waitMessage(t, bobEv, 2*time.Second); got != nil {
 		t.Fatalf("bob still received traffic after parting: %q", got.Msg.Body)
+	}
+}
+
+// TestBurstPreservesOrder guards the property an alerting channel depends on:
+// a script that emits a multi-line report must have those lines arrive in the
+// order it wrote them. Send jitter used to be applied per message in its own
+// goroutine, which shuffled any burst.
+func TestBurstPreservesOrder(t *testing.T) {
+	addr, stop, _ := startRelay(t)
+	defer stop()
+
+	alice, _, ca := startClient(t, addr, "alice")
+	defer ca()
+	bob, bobEv, cb := startClient(t, addr, "bob")
+	defer cb()
+
+	const pass = "pass"
+	_ = alice.Join("#burst", pass)
+	_ = bob.Join("#burst", pass)
+	time.Sleep(300 * time.Millisecond)
+
+	const n = 12
+	for i := 0; i < n; i++ {
+		if err := alice.Say("#burst", fmt.Sprintf("line-%02d", i)); err != nil {
+			t.Fatalf("say %d: %v", i, err)
+		}
+	}
+
+	for i := 0; i < n; i++ {
+		got := waitMessage(t, bobEv, 10*time.Second)
+		if got == nil {
+			t.Fatalf("only %d of %d lines arrived", i, n)
+		}
+		if want := fmt.Sprintf("line-%02d", i); got.Msg.Body != want {
+			t.Fatalf("burst reordered: position %d is %q, want %q", i, got.Msg.Body, want)
+		}
 	}
 }
