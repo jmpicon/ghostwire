@@ -22,6 +22,7 @@ import (
 
 	"github.com/jmpicon/ghostwire/internal/client"
 	gcrypto "github.com/jmpicon/ghostwire/internal/crypto"
+	"github.com/jmpicon/ghostwire/internal/launch"
 	"github.com/jmpicon/ghostwire/internal/tor"
 	"github.com/jmpicon/ghostwire/internal/ui"
 )
@@ -135,44 +136,18 @@ func run(o *options) error {
 }
 
 // transport picks the dialer and refuses to silently deanonymise you.
+// The decision itself lives in internal/launch so the terminal and desktop
+// clients cannot drift apart on it.
 func transport(o *options) (tor.DialFunc, bool, error) {
-	if strings.TrimSpace(o.relay) == "" {
-		return nil, false, errors.New("no relay: pass -relay <addr> or set GW_RELAY")
-	}
-	isOnion := tor.IsOnion(o.relay)
-
-	if o.clearnet {
-		if isOnion {
-			return nil, false, errors.New("-clearnet cannot reach a .onion address")
-		}
+	dial, viaTor, err := launch.Transport(o.relay, o.socks, o.clearnet)
+	if err == nil && !viaTor {
 		fmt.Fprintln(os.Stderr, "warning: -clearnet. the relay will see your IP address.")
-		return tor.Direct(), false, nil
 	}
-	if !isOnion {
-		return nil, false, fmt.Errorf(
-			"%q is not a v3 onion address.\n"+
-				"ghostwire refuses to connect anonymously to something that is not anonymous.\n"+
-				"pass -clearnet if you genuinely mean to expose your IP (lab use only)", o.relay)
-	}
-	dial, err := tor.SOCKS(o.socks, true)
-	if err != nil {
-		return nil, false, fmt.Errorf("tor SOCKS at %s: %w (is tor running?)", o.socks, err)
-	}
-	return dial, true, nil
+	return dial, viaTor, err
 }
 
 func identity(path string) (*gcrypto.Identity, error) {
-	if path == "" {
-		return gcrypto.NewIdentity()
-	}
-	seed, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("identity %s: %w (create one with: gw keygen -o %s)", path, err, path)
-	}
-	if len(seed) != ed25519.SeedSize {
-		return nil, fmt.Errorf("identity %s: expected %d bytes, got %d", path, ed25519.SeedSize, len(seed))
-	}
-	return gcrypto.IdentityFromSeed(seed)
+	return launch.Identity(path)
 }
 
 func collectJoins(o *options) ([]ui.Autojoin, error) {
@@ -413,12 +388,7 @@ func runTail(args []string) {
 	}
 }
 
-func env(k, def string) string {
-	if v := os.Getenv(k); v != "" {
-		return v
-	}
-	return def
-}
+func env(k, def string) string { return launch.Env(k, def) }
 
 func fatal(format string, args ...any) {
 	fmt.Fprintf(os.Stderr, "gw: "+format+"\n", args...)

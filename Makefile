@@ -7,7 +7,7 @@ GOFLAGS   := -trimpath
 PLATFORMS := linux/amd64 linux/arm64 linux/arm darwin/amd64 darwin/arm64 windows/amd64 freebsd/amd64
 GOARM     ?= 7
 
-.PHONY: all build test race vet fmt lint cross clean install docker onion help
+.PHONY: all build desktop test race vet fmt lint cross clean install docker onion help
 
 all: build
 
@@ -17,6 +17,16 @@ build:
 	CGO_ENABLED=0 go build $(GOFLAGS) -ldflags '$(LDFLAGS)' -o bin/gw  ./cmd/gw
 	CGO_ENABLED=0 go build $(GOFLAGS) -ldflags '$(LDFLAGS)' -o bin/gwd ./cmd/gwd
 	@echo "built $(VERSION)"
+
+## desktop: compile the graphical client (needs cgo + OpenGL/X11 headers)
+##   Debian/Ubuntu: apt install xorg-dev libxkbcommon-dev libwayland-dev \
+##                              wayland-protocols libdecor-0-dev libgl1-mesa-dev
+## Deliberately excluded from `cross`: unlike gw and gwd this links against the
+## host's graphics stack, so it cannot be cross-compiled from one static build.
+desktop:
+	@mkdir -p bin
+	CGO_ENABLED=1 go build $(GOFLAGS) -ldflags '$(LDFLAGS)' -o bin/gw-desktop ./cmd/gw-desktop
+	@echo "built bin/gw-desktop $(VERSION)"
 
 ## test: unit and integration tests with the race detector
 test: race
