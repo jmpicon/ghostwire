@@ -49,11 +49,26 @@ Para no copiar ghostwire cada arranque, usa el Almacenamiento Persistente
 
   1. Menú → Tails → «Almacenamiento Persistente». Créalo con una contraseña
      fuerte. Activa la opción «Carpeta persistente».
-  2. Copia a  /home/amnesia/Persistent/  estos dos archivos:
-        gw                    (el binario; sale de `make build` → bin/gw)
-        ghostwire-tails.sh    (este lanzador)
-  3. Abre un Terminal y:
+
+  2. Descarga el binario y el lanzador DENTRO de Tails (todo va por Tor):
+     abre el Navegador Tor y baja estos dos de la release oficial
+
+        https://github.com/jmpicon/ghostwire/releases/latest
+           → gw-linux-amd64        (el binario)
+           → ghostwire-tails.sh    (este lanzador)
+
+     o desde un Terminal:
+        cd ~/Persistent
+        torsocks curl -L -o gw \
+          https://github.com/jmpicon/ghostwire/releases/latest/download/gw-linux-amd64
+        torsocks curl -L -o ghostwire-tails.sh \
+          https://github.com/jmpicon/ghostwire/releases/latest/download/ghostwire-tails.sh
+
+  3. Dale permiso de ejecución:
         chmod +x ~/Persistent/gw ~/Persistent/ghostwire-tails.sh
+
+  (Si bajaste con el navegador, renombra gw-linux-amd64 a gw y muévelo a
+   ~/Persistent/ antes del chmod.)
 
 Si prefieres NO dejar nada ni cifrado (máxima amnesia), sáltate el Persistente
 y copia esos dos archivos a la carpeta personal en cada arranque desde otro
