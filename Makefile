@@ -25,7 +25,7 @@ build:
 ## host's graphics stack, so it cannot be cross-compiled from one static build.
 desktop:
 	@mkdir -p bin
-	CGO_ENABLED=1 go build $(GOFLAGS) -ldflags '$(LDFLAGS)' -o bin/gw-desktop ./cmd/gw-desktop
+	CGO_ENABLED=1 go build -tags gui $(GOFLAGS) -ldflags '$(LDFLAGS)' -o bin/gw-desktop ./cmd/gw-desktop
 	@echo "built bin/gw-desktop $(VERSION)"
 
 ## test: unit and integration tests with the race detector

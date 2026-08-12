@@ -1,3 +1,5 @@
+//go:build gui
+
 // Command gw-desktop is the graphical ghostwire client.
 //
 // It is a native window, not a browser: no webview, no JavaScript, no bundled
