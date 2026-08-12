@@ -1,0 +1,87 @@
+╔══════════════════════════════════════════════════════════════════╗
+║  ghostwire portátil — chat cifrado sobre Tor desde un USB          ║
+╚══════════════════════════════════════════════════════════════════╝
+
+QUÉ ES
+──────
+Un USB que llevas encima. Lo enchufas en cualquier Linux, abres una
+terminal en esta carpeta y escribes:
+
+    ./ghostwire.sh
+
+Arranca su propio Tor (el que va DENTRO del USB, no el del ordenador),
+espera al circuito, y abre el chat. Todo lo que se escribe en disco
+—datos de Tor, temporales, la clave de la sesión— vive DENTRO del USB.
+Al sacar el USB, ghostwire no ha dejado nada en ese ordenador.
+
+    ./ghostwire.sh                 → interfaz de chat
+    ./ghostwire.sh -join '#sala'   → entra directo a una sala
+
+Dentro:  escribe y pulsa Enter.  /join #otra  ·  /names  ·  /quit
+         /panic  borra las claves y cierra al instante.
+
+
+LO QUE SÍ GARANTIZA
+───────────────────
+• Ghostwire no escribe NADA en el disco del ordenador ajeno.
+• Identidad efímera: una clave nueva en RAM cada vez, nunca en disco.
+• Todo el tráfico va por Tor hasta el relay (un servicio .onion).
+• Al cerrar, los datos temporales de Tor de esta sesión se borran del USB.
+
+
+LO QUE NO PUEDE GARANTIZAR  (LÉELO)
+───────────────────────────────────
+Esto corre SOBRE el sistema del ordenador ajeno, y ese sistema apunta
+cosas que ghostwire no puede borrar:
+
+  • el registro de que se enchufó un USB,
+  • la memoria volcada a la swap del disco del host,
+  • el journal del sistema.
+
+Y sobre todo: si ese ordenador está comprometido (un keylogger, un
+troyano), lo VE TODO — la passphrase incluida. Ningún USB arregla eso.
+
+  ⇒ "sin rastro" aquí significa "ghostwire no deja rastro", NO "el
+     ordenador se olvida de todo".
+
+
+SI QUIERES CERO RASTRO DE VERDAD
+────────────────────────────────
+La única forma de que un ordenador ajeno no recuerde NADA es no usar su
+sistema: ARRANCAR el ordenador DESDE un USB amnésico. Eso es Tails
+(https://tails.net):
+
+  • Arranca desde el USB; el disco del ordenador ni se toca.
+  • Todo corre en RAM; al apagar, la RAM se borra. Cero rastro real.
+  • Tails ya trae Tor corriendo.
+
+Para usar ghostwire dentro de Tails: copia el binario `bin/gw` y ejecuta
+
+    GW_TOR_SOCKS=127.0.0.1:9050 ./gw -relay <TU_ONION>:1717 -join '#sala'
+
+(Tails expone Tor en el puerto 9050; el binario es estático, funciona
+tal cual.)
+
+Resumen honesto:
+  • Este USB portátil  = cómodo, sin reiniciar, ghostwire no deja rastro,
+                         pero confías en el sistema del ordenador ajeno.
+  • Tails + gw         = incómodo (hay que reiniciar), pero es el único
+                         "cero rastro" de verdad.
+
+
+DÓNDE ESTÁ EL RELAY
+───────────────────
+Por defecto apunta a tu relay en la Raspberry:
+  4f55szire2l7yfblkty2jism6lzshvm6x3ydlappjuab6w3pgmsvpoad.onion:1717
+
+Para cambiarlo sin editar nada:  GW_RELAY=<otro>.onion:1717 ./ghostwire.sh
+
+
+AVISOS
+──────
+• Solo Linux x86-64 por ahora (el Tor empaquetado es de Linux).
+• El primer arranque de Tor tarda entre 10 y 60 segundos: es normal.
+• El nombre de la sala MÁS la passphrase SON el canal. No hay registro:
+  quien tenga ambos entra; quien no, no sabe ni que la sala existe.
+• Comprueba la huella de 8 caracteres de la otra persona por teléfono.
+  El nombre es decorado; la huella no se puede falsificar.

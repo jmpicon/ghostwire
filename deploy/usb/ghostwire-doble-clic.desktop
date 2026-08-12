@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=ghostwire (chat anónimo)
+Comment=Chat cifrado sobre Tor desde este USB
+Exec=sh -c 'cd "$(dirname "%k")" && (x-terminal-emulator -e ./ghostwire.sh || gnome-terminal -- ./ghostwire.sh || konsole -e ./ghostwire.sh || xterm -e ./ghostwire.sh)'
+Icon=network-wireless-encrypted
+Terminal=false
+Categories=Network;InstantMessaging;
