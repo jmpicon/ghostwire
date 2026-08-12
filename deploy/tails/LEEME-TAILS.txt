@@ -1,0 +1,105 @@
+╔══════════════════════════════════════════════════════════════════╗
+║  ghostwire en Tails — chat cifrado con CERO rastro de verdad       ║
+╚══════════════════════════════════════════════════════════════════╝
+
+POR QUÉ TAILS Y NO EL USB PORTÁTIL
+──────────────────────────────────
+El USB portátil (deploy/usb) corre SOBRE el sistema del ordenador ajeno, así
+que ese sistema apunta cosas que no podemos borrar (el montaje del USB, la
+swap, el journal) y un ordenador con keylogger lo ve todo.
+
+Tails es distinto: ARRANCAS el ordenador DESDE el USB de Tails. El disco del
+ordenador ni se toca. Todo corre en RAM. Al apagar, la RAM se borra. No hay
+nada que recordar porque no se usó el sistema del ordenador. Eso es el
+cero-rastro de verdad, y solo se consigue así.
+
+Tails, además:
+  • ya trae Tor corriendo,
+  • bloquea con su cortafuegos TODO tráfico que no vaya por Tor,
+  • no monta el disco del ordenador salvo que se lo pidas.
+
+
+LO QUE NECESITAS
+────────────────
+  • Un USB DEDICADO de ≥ 8 GB (NO el de empresa: instalar Tails BORRA el USB).
+  • Media hora la primera vez.
+
+
+PASO 1 — INSTALAR TAILS  (una vez)
+──────────────────────────────────
+  1. Ve a  https://tails.net/install/  y sigue el asistente para Linux.
+  2. Descarga la imagen USB de Tails y VERIFICA la firma (el asistente lo hace;
+     no te lo saltes: es lo que garantiza que la imagen no está manipulada).
+  3. Grábala en el USB dedicado con el propio instalador de Tails o con
+     GNOME Discos / balenaEtcher. Esto BORRA ese USB entero.
+
+
+PASO 2 — ARRANCAR TAILS
+───────────────────────
+  1. Con el USB puesto, enciende el ordenador y entra en el menú de arranque
+     (suele ser F12, F2, Esc o Supr según la marca) y elige el USB.
+  2. En la pantalla de bienvenida de Tails, «Iniciar Tails».
+  3. Espera a que conecte a Tor (arriba a la derecha, la cebolla en verde).
+
+
+PASO 3 — METER GHOSTWIRE  (una vez, opcional pero recomendado)
+──────────────────────────────────────────────────────────────
+Para no copiar ghostwire cada arranque, usa el Almacenamiento Persistente
+(un volumen CIFRADO dentro del propio USB de Tails):
+
+  1. Menú → Tails → «Almacenamiento Persistente». Créalo con una contraseña
+     fuerte. Activa la opción «Carpeta persistente».
+  2. Copia a  /home/amnesia/Persistent/  estos dos archivos:
+        gw                    (el binario; sale de `make build` → bin/gw)
+        ghostwire-tails.sh    (este lanzador)
+  3. Abre un Terminal y:
+        chmod +x ~/Persistent/gw ~/Persistent/ghostwire-tails.sh
+
+Si prefieres NO dejar nada ni cifrado (máxima amnesia), sáltate el Persistente
+y copia esos dos archivos a la carpeta personal en cada arranque desde otro
+USB normal.
+
+
+PASO 4 — USARLO
+───────────────
+Abre un Terminal en Tails y:
+
+    ~/Persistent/ghostwire-tails.sh -join '#sala'
+
+  o sin sala, para elegir dentro:
+
+    ~/Persistent/ghostwire-tails.sh
+
+Dentro:  escribe y Enter.  /join #otra  ·  /names  ·  /keys  ·  /quit
+         /panic  borra las claves y cierra al instante.
+
+Comando exacto verificado (Tails expone Tor en 9050, el binario es estático):
+    GW_TOR_SOCKS=127.0.0.1:9050 ~/Persistent/gw \
+        -relay <TU_ONION>:1717 -join '#sala'
+El lanzador ya pone GW_TOR_SOCKS y el relay por ti.
+
+
+IDENTIDAD
+─────────
+Por defecto la identidad es EFÍMERA: una clave nueva en RAM cada vez, nada
+persiste. Es lo coherente con Tails. Si quisieras que te reconozcan entre
+arranques, tendrías que guardar una clave en el Persistente con:
+    ~/Persistent/gw keygen -o ~/Persistent/id
+    ...luego lanzar con  -identity ~/Persistent/id
+pero eso ENLAZA tus sesiones: solo si de verdad lo necesitas.
+
+
+RELAY
+─────
+Por defecto apunta a tu Raspberry:
+  4f55szire2l7yfblkty2jism6lzshvm6x3ydlappjuab6w3pgmsvpoad.onion:1717
+Cámbialo:  GW_RELAY=<otro>.onion:1717 ~/Persistent/ghostwire-tails.sh
+
+
+RESUMEN HONESTO
+───────────────
+  • USB portátil (deploy/usb)  → cómodo, sin reiniciar, pero confías en el
+                                 sistema del ordenador ajeno.
+  • Tails + ghostwire (esto)   → hay que reiniciar el ordenador desde el USB,
+                                 pero es el ÚNICO cero-rastro real.
+El relay (la Raspberry) y el modelo de cifrado son los mismos en las dos.
