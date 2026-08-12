@@ -14,3 +14,7 @@ onion.key
 *.test
 coverage.*
 .DS_Store
+
+# USB bundle: binarios del sistema, se regeneran con build-usb.sh
+deploy/usb/bin/
+deploy/usb/tor/
